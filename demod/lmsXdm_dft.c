@@ -249,7 +249,6 @@ int viterbi(char *rc) {
     return 0;
 }
 
-
 float vits_dist(int c, float *rc) {
     int bit0 = ((c>>1)&1) * 2 - 1;
     int bit1 = (c&1) * 2 - 1;
@@ -522,8 +521,8 @@ int get_FrameNb() {
 }
 
 
-char weekday[7][3] = { "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"};
-//char weekday[7][4] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+//char weekday[7][3] = { "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"};
+char weekday[7][4] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
 int get_GPStime() {
     int i;
@@ -911,7 +910,7 @@ int main(int argc, char **argv) {
     fpname = argv[0];
     ++argv;
     while ((*argv) && (!wavloaded)) {
-        if      ( (strcmp(*argv, "-h") == 0) || (strcmp(*argv, "--help") == 0) ) {
+        if ( (strcmp(*argv, "-h") == 0) || (strcmp(*argv, "--help") == 0) ) {
             fprintf(stderr, "%s [options] audio.wav\n", fpname);
             fprintf(stderr, "  options:\n");
             fprintf(stderr, "       -v, --verbose\n");
@@ -971,7 +970,7 @@ int main(int argc, char **argv) {
         else {
             fp = fopen(*argv, "rb");
             if (fp == NULL) {
-                fprintf(stderr, "%s konnte nicht geoeffnet werden\n", *argv);
+                fprintf(stderr, "%s could not be opened.\n", *argv);
                 return -1;
             }
             wavloaded = 1;
@@ -1044,7 +1043,7 @@ int main(int argc, char **argv) {
                         herr1 = 1;
                     }
                 }
-                if (herrs <= 3) header_found = 1; // herrs <= 3 bitfehler in header
+                if (herrs <= 3) header_found = 1; // herrs <= 3 bit error in header
 
                 if (header_found) {
 
