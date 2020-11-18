@@ -37,7 +37,6 @@ import sys
 import time
 from threading import Thread
 
-
 GPSD_HOST = '127.0.0.1'  # gpsd
 GPSD_PORT = 2947  # defaults
 GPSD_PROTOCOL = 'json'  # "
@@ -118,7 +117,8 @@ class GPSDSocket(object):
         """
         try:
             waitin, _waitout, _waiterror = select.select((self.streamSock,), (), (), timeout)
-            if not waitin: return None
+            if not waitin:
+                return None
             else:
                 gpsd_response = self.streamSock.makefile()  # '.makefile(buffering=4096)' In strictly Python3
                 self.response = gpsd_response.readline()
@@ -143,17 +143,20 @@ class DataStream(object):
     """
     packages = {
         'VERSION': {'release', 'proto_major', 'proto_minor', 'remote', 'rev'},
-        'TPV': {'alt', 'climb', 'device', 'epc', 'epd', 'eps', 'ept', 'epv', 'epx', 'epy', 'lat', 'lon', 'mode', 'speed', 'tag', 'time', 'track'},
+        'TPV': {'alt', 'climb', 'device', 'epc', 'epd', 'eps', 'ept', 'epv', 'epx', 'epy', 'lat', 'lon', 'mode',
+                'speed', 'tag', 'time', 'track'},
         'SKY': {'satellites', 'gdop', 'hdop', 'pdop', 'tdop', 'vdop', 'xdop', 'ydop'},
         # Subset of SKY: 'satellites': {'PRN', 'ss', 'el', 'az', 'used'}  # is always present.
         'GST': {'alt', 'device', 'lat', 'lon', 'major', 'minor', 'orient', 'rms', 'time'},
-        'ATT': {'acc_len', 'acc_x', 'acc_y', 'acc_z', 'depth', 'device', 'dip', 'gyro_x', 'gyro_y', 'heading', 'mag_len', 'mag_st', 'mag_x',
+        'ATT': {'acc_len', 'acc_x', 'acc_y', 'acc_z', 'depth', 'device', 'dip', 'gyro_x', 'gyro_y', 'heading',
+                'mag_len', 'mag_st', 'mag_x',
                 'mag_y', 'mag_z', 'pitch', 'pitch_st', 'roll', 'roll_st', 'temperature', 'time', 'yaw', 'yaw_st'},
         # 'POLL': {'active', 'tpv', 'sky', 'time'},
         'PPS': {'device', 'clock_sec', 'clock_nsec', 'real_sec', 'real_nsec', 'precision'},
         'TOFF': {'device', 'clock_sec', 'clock_nsec', 'real_sec', 'real_nsec'},
         'DEVICES': {'devices', 'remote'},
-        'DEVICE': {'activated', 'bps', 'cycle', 'mincycle', 'driver', 'flags', 'native', 'parity', 'path', 'stopbits', 'subtype'},
+        'DEVICE': {'activated', 'bps', 'cycle', 'mincycle', 'driver', 'flags', 'native', 'parity', 'path', 'stopbits',
+                   'subtype'},
         # 'AIS': {}  # see: http://catb.org/gpsd/AIVDM.html
         'ERROR': {'message'}}  # TODO: Full suite of possible GPSD output
 
@@ -163,7 +166,8 @@ class DataStream(object):
             _emptydict = {key: 'n/a' for key in dataset}
             setattr(self, package_name, _emptydict)
 
-        self.DEVICES['devices'] = {key: 'n/a' for key in self.packages['DEVICE']}  # How does multiple listed devices work?
+        self.DEVICES['devices'] = {key: 'n/a' for key in
+                                   self.packages['DEVICE']}  # How does multiple listed devices work?
         # self.POLL = {'tpv': self.TPV, 'sky': self.SKY, 'time': 'n/a', 'active': 'n/a'}
 
     def unpack(self, gpsd_socket_response):
@@ -197,10 +201,10 @@ class GPSDAdaptor(object):
     ''' Connect to a GPSD instance, and pass data onto a callback function '''
 
     def __init__(self,
-        hostname = '127.0.0.1',
-        port = 2947,
-        callback = None,
-        update_decimation = 30):
+                 hostname='127.0.0.1',
+                 port=2947,
+                 callback=None,
+                 update_decimation=30):
         '''
         Initialize a GPSAdaptor object.
 
@@ -221,11 +225,9 @@ class GPSDAdaptor(object):
         self.update_decimation = update_decimation
         self.update_counter = 0
 
-
         self.gpsd_thread_running = False
         self.gpsd_thread = None
         self.start()
-
 
     def start(self):
         ''' Start the GPSD thread '''
@@ -236,15 +238,12 @@ class GPSDAdaptor(object):
             self.gpsd_thread = Thread(target=self.gpsd_process_thread)
             self.gpsd_thread.start()
 
-
-
     def close(self):
         ''' Stop the GPSD thread. '''
         self.gpsd_thread_running = False
         # Wait for the thread to close.
         if self.gpsd_thread != None:
             self.gpsd_thread.join()
-
 
     def send_to_callback(self, data):
         '''
@@ -260,7 +259,6 @@ class GPSDAdaptor(object):
                 traceback.print_exc()
                 logging.error("GPSD - Error Passing data to callback - %s" % str(e))
 
-
     def gpsd_process_thread(self):
         ''' Attempt to connect to a GPSD instance, and read position information '''
         while self.gpsd_thread_running:
@@ -268,7 +266,7 @@ class GPSDAdaptor(object):
             # Attempt to connect.
             _gpsd_socket = GPSDSocket()
             _data_stream = DataStream()
-            _success = _gpsd_socket.connect(host = self.hostname, port = self.port)
+            _success = _gpsd_socket.connect(host=self.hostname, port=self.port)
 
             # If we could not connect, wait and try again.
             if not _success:
@@ -277,14 +275,13 @@ class GPSDAdaptor(object):
                 continue
 
             # Start watching for data.
-            _gpsd_socket.watch(gpsd_protocol = 'json')
+            _gpsd_socket.watch(gpsd_protocol='json')
             logging.info("GPSD - Connected to GPSD instance at %s" % self.hostname)
 
             while self.gpsd_thread_running:
                 # We should be getting GPS data every second.
                 # If this isn't the case, we should close the connection and re-connect.
                 _gpsd_data = _gpsd_socket.next(timeout=10)
-
 
                 if _gpsd_data == None or _gpsd_data == '':
                     logging.error("GPSD - No data received. Attempting to reconnect.")
@@ -323,7 +320,6 @@ class GPSDAdaptor(object):
 
                         self.update_counter += 1
 
-
             # Close the GPSD connection.
             try:
                 _gpsd_socket.close()
@@ -331,20 +327,16 @@ class GPSDAdaptor(object):
                 logging.error("GPSD - Error when closing connection: %s" % str(e))
 
 
-
-
-
 if __name__ == '__main__':
-
     def print_dict(data):
         print(data)
+
 
     logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging.DEBUG)
 
     _gpsd = GPSDAdaptor(callback=print_dict)
     time.sleep(30)
     _gpsd.close()
-
 
     # gpsd_socket = GPSDSocket()
     # data_stream = DataStream()

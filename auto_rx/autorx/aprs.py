@@ -8,18 +8,19 @@
 import datetime
 import logging
 import random
+import socket
 import time
 import traceback
-import socket
 from threading import Thread
+
 from . import __version__ as auto_rx_version
+
 try:
     # Python 2
     from Queue import Queue
 except ImportError:
     # Python 3
     from queue import Queue
-
 
 
 def telemetry_to_aprs_position(sonde_data, object_name="<id>", aprs_comment="BOM Balloon", position_report=False):
@@ -83,7 +84,7 @@ def telemetry_to_aprs_position(sonde_data, object_name="<id>", aprs_comment="BOM
         # New Sonde types will be added in here.
         else:
             # Unknown sonde type, don't know how to handle this yet.
-            logging.error('No APRS ID conversion available for sonde type: %s'  % sonde_data['type'])
+            logging.error('No APRS ID conversion available for sonde type: %s' % sonde_data['type'])
             return (None, None)
     else:
         _object_name = object_name
@@ -92,20 +93,20 @@ def telemetry_to_aprs_position(sonde_data, object_name="<id>", aprs_comment="BOM
     if len(_object_name) > 9:
         _object_name = _object_name[:9]
     elif len(_object_name) < 9:
-        _object_name = _object_name + " "*(9-len(_object_name))
+        _object_name = _object_name + " " * (9 - len(_object_name))
 
     # Use the actual sonde frequency, if we have it.
     if 'f_centre' in sonde_data:
         # We have an estimate of the sonde's centre frequency from the modem, use this in place of
         # the RX frequency.
         # Round to 1 kHz
-        _freq = round(sonde_data['f_centre']/1000.0)
+        _freq = round(sonde_data['f_centre'] / 1000.0)
         # Convert to MHz.
-        _freq = "%.3f MHz" % (_freq/1e3)
+        _freq = "%.3f MHz" % (_freq / 1e3)
     else:
         # Otherwise, use the normal frequency.
         _freq = sonde_data['freq']
-    
+
     # Generate the comment field.
     _aprs_comment = aprs_comment
     _aprs_comment = _aprs_comment.replace("<freq>", _freq)
@@ -125,25 +126,25 @@ def telemetry_to_aprs_position(sonde_data, object_name="<id>", aprs_comment="BOM
     lat_minute = abs(lat - int(lat)) * 60.0
     lat_min_str = ("%02.4f" % lat_minute).zfill(7)[:5]
     lat_dir = "S"
-    if lat>0.0:
+    if lat > 0.0:
         lat_dir = "N"
-    lat_str = "%02d%s" % (lat_degree,lat_min_str) + lat_dir
-    
+    lat_str = "%02d%s" % (lat_degree, lat_min_str) + lat_dir
+
     # Convert float longitude to APRS format (DDDMM.MM)
     lon = float(sonde_data["lon"])
     lon_degree = abs(int(lon))
     lon_minute = abs(lon - int(lon)) * 60.0
     lon_min_str = ("%02.4f" % lon_minute).zfill(7)[:5]
     lon_dir = "E"
-    if lon<0.0:
+    if lon < 0.0:
         lon_dir = "W"
-    lon_str = "%03d%s" % (lon_degree,lon_min_str) + lon_dir
+    lon_str = "%03d%s" % (lon_degree, lon_min_str) + lon_dir
 
     # Generate the added digits of precision, as per http://www.aprs.org/datum.txt
     # Base-91 can only encode decimal integers between 0 and 93 (otherwise we end up with non-printable characters)
     # So, we have to scale the range 00-99 down to 0-90, being careful to avoid errors due to floating point math.
-    _lat_prec = int(round(float(("%02.4f" % lat_minute)[-2:])/1.10))
-    _lon_prec = int(round(float(("%02.4f" % lon_minute)[-2:])/1.10))
+    _lat_prec = int(round(float(("%02.4f" % lat_minute)[-2:]) / 1.10))
+    _lon_prec = int(round(float(("%02.4f" % lon_minute)[-2:]) / 1.10))
 
     # Now we can add 33 to the 0-90 value to produce the Base-91 character.
     _lat_prec = chr(_lat_prec + 33)
@@ -155,41 +156,41 @@ def telemetry_to_aprs_position(sonde_data, object_name="<id>", aprs_comment="BOM
     _datum = "!w%s%s!" % (_lat_prec, _lon_prec)
 
     # Convert Alt (in metres) to feet
-    alt = int(float(sonde_data["alt"])/0.3048)
+    alt = int(float(sonde_data["alt"]) / 0.3048)
 
     # Produce the timestamp
     _aprs_timestamp = sonde_data['datetime_dt'].strftime("%H%M%S")
-    
+
     # Generate course/speed data, if provided in the telemetry dictionary
     if ('heading' in sonde_data.keys()) and ('vel_h' in sonde_data.keys()):
-        course_speed = "%03d/%03d" % (int(sonde_data['heading']), int(sonde_data['vel_h']*1.944))
+        course_speed = "%03d/%03d" % (int(sonde_data['heading']), int(sonde_data['vel_h'] * 1.944))
     else:
         course_speed = "000/000"
-
 
     if position_report:
         # Produce an APRS position report string
         # Note, we are using the 'position with timestamp' data type, as per http://www.aprs.org/doc/APRS101.PDF
-        out_str = "/%sh%s/%sO%s/A=%06d %s %s" % (_aprs_timestamp,lat_str,lon_str,course_speed,alt,_aprs_comment,_datum)
+        out_str = "/%sh%s/%sO%s/A=%06d %s %s" % (
+        _aprs_timestamp, lat_str, lon_str, course_speed, alt, _aprs_comment, _datum)
 
     else:
         # Produce an APRS Object
-        out_str = ";%s*%sh%s/%sO%s/A=%06d %s %s" % (_object_name,_aprs_timestamp,lat_str,lon_str,course_speed,alt,_aprs_comment,_datum)
+        out_str = ";%s*%sh%s/%sO%s/A=%06d %s %s" % (
+        _object_name, _aprs_timestamp, lat_str, lon_str, course_speed, alt, _aprs_comment, _datum)
 
     # Return both the packet, and the 'callsign'.
     return (out_str, _object_name.strip())
 
 
-
-def generate_station_object(callsign, lat, lon, comment="radiosonde_auto_rx SondeGate v<version>", icon='/r', position_report=False):
+def generate_station_object(callsign, lat, lon, comment="radiosonde_auto_rx SondeGate v<version>", icon='/r',
+                            position_report=False):
     ''' Generate a station object '''
 
     # Pad or limit the station callsign to 9 characters, if it is to long or short.
     if len(callsign) > 9:
         callsign = callsign[:9]
     elif len(callsign) < 9:
-        callsign = callsign + " "*(9-len(callsign))
-
+        callsign = callsign + " " * (9 - len(callsign))
 
     # Convert float latitude to APRS format (DDMM.MM)
     lat = float(lat)
@@ -197,25 +198,25 @@ def generate_station_object(callsign, lat, lon, comment="radiosonde_auto_rx Sond
     lat_minute = abs(lat - int(lat)) * 60.0
     lat_min_str = ("%02.4f" % lat_minute).zfill(7)[:5]
     lat_dir = "S"
-    if lat>0.0:
+    if lat > 0.0:
         lat_dir = "N"
-    lat_str = "%02d%s" % (lat_degree,lat_min_str) + lat_dir
-    
+    lat_str = "%02d%s" % (lat_degree, lat_min_str) + lat_dir
+
     # Convert float longitude to APRS format (DDDMM.MM)
     lon = float(lon)
     lon_degree = abs(int(lon))
     lon_minute = abs(lon - int(lon)) * 60.0
     lon_min_str = ("%02.4f" % lon_minute).zfill(7)[:5]
     lon_dir = "E"
-    if lon<0.0:
+    if lon < 0.0:
         lon_dir = "W"
-    lon_str = "%03d%s" % (lon_degree,lon_min_str) + lon_dir
+    lon_str = "%03d%s" % (lon_degree, lon_min_str) + lon_dir
 
     # Generate the added digits of precision, as per http://www.aprs.org/datum.txt
     # Base-91 can only encode decimal integers between 0 and 93 (otherwise we end up with non-printable characters)
     # So, we have to scale the range 00-99 down to 0-90, being careful to avoid errors due to floating point math.
-    _lat_prec = int(round(float(("%02.4f" % lat_minute)[-2:])/1.10))
-    _lon_prec = int(round(float(("%02.4f" % lon_minute)[-2:])/1.10))
+    _lat_prec = int(round(float(("%02.4f" % lat_minute)[-2:]) / 1.10))
+    _lon_prec = int(round(float(("%02.4f" % lon_minute)[-2:]) / 1.10))
 
     # Now we can add 33 to the 0-90 value to produce the Base-91 character.
     _lat_prec = chr(_lat_prec + 33)
@@ -228,7 +229,6 @@ def generate_station_object(callsign, lat, lon, comment="radiosonde_auto_rx Sond
     # Generate timestamp using current UTC time
     _aprs_timestamp = datetime.datetime.utcnow().strftime("%H%M%S")
 
-
     # Add version string to position comment, if requested.
     _aprs_comment = comment
     _aprs_comment = _aprs_comment.replace('<version>', auto_rx_version)
@@ -240,7 +240,8 @@ def generate_station_object(callsign, lat, lon, comment="radiosonde_auto_rx Sond
 
     else:
         # Produce an object string
-        out_str = ";%s*%sh%s%s%s%s%s %s" % (callsign, _aprs_timestamp, lat_str, icon[0], lon_str, icon[1], _aprs_comment, _datum)
+        out_str = ";%s*%sh%s%s%s%s%s %s" % (
+        callsign, _aprs_timestamp, lat_str, icon[0], lon_str, icon[1], _aprs_comment, _datum)
 
     return out_str
 
@@ -267,28 +268,28 @@ class APRSUploader(object):
     '''
 
     # We require the following fields to be present in the incoming telemetry dictionary data
-    REQUIRED_FIELDS = ['frame', 'id', 'datetime', 'lat', 'lon', 'alt', 'temp', 'type', 'freq', 'freq_float', 'datetime_dt']
+    REQUIRED_FIELDS = ['frame', 'id', 'datetime', 'lat', 'lon', 'alt', 'temp', 'type', 'freq', 'freq_float',
+                       'datetime_dt']
 
-
-    def __init__(self, 
-                aprs_callsign = 'N0CALL', 
-                aprs_passcode = "00000",
-                object_name_override = None,
-                object_comment = "RadioSonde",
-                position_report = False,
-                aprsis_host = 'rotate.aprs2.net',
-                aprsis_port = 14580,
-                station_beacon = False,
-                station_beacon_rate = 30,
-                station_beacon_position = (0.0,0.0,0.0),
-                station_beacon_comment = "radiosonde_auto_rx SondeGate v<version>",
-                station_beacon_icon = "/r",
-                synchronous_upload_time = 30,
-                callsign_validity_threshold = 5,
-                upload_queue_size = 16,
-                upload_timeout = 10,
-                inhibit = False
-                ):
+    def __init__(self,
+                 aprs_callsign='N0CALL',
+                 aprs_passcode="00000",
+                 object_name_override=None,
+                 object_comment="RadioSonde",
+                 position_report=False,
+                 aprsis_host='rotate.aprs2.net',
+                 aprsis_port=14580,
+                 station_beacon=False,
+                 station_beacon_rate=30,
+                 station_beacon_position=(0.0, 0.0, 0.0),
+                 station_beacon_comment="radiosonde_auto_rx SondeGate v<version>",
+                 station_beacon_icon="/r",
+                 synchronous_upload_time=30,
+                 callsign_validity_threshold=5,
+                 upload_queue_size=16,
+                 upload_timeout=10,
+                 inhibit=False
+                 ):
         """ Initialise an APRS Uploader object.
 
         Args:
@@ -384,7 +385,6 @@ class APRSUploader(object):
 
         self.log_info("APRS Uploader Started.")
 
-
     def aprsis_upload(self, source, packet, igate=False):
         """ Upload a packet to APRS-IS
 
@@ -400,7 +400,6 @@ class APRSUploader(object):
         if self.inhibit:
             self.log_info("Upload Inhibited: %s" % packet)
             return True
-
 
         # Generate APRS packet
         if igate:
@@ -431,7 +430,6 @@ class APRSUploader(object):
             self.log_error("Upload to APRS-IS Failed - %s" % str(e))
             return False
 
-
     def beacon_station_position(self):
         ''' Send a station position beacon into APRS-IS '''
         if self.station_beacon['enabled']:
@@ -440,26 +438,22 @@ class APRSUploader(object):
                 self.last_user_position_upload = time.time()
                 return
 
-
             # Generate the station position packet
             # Note - this is now generated as an APRS position report, for radiosondy.info compatability.
             _packet = generate_station_object(self.aprs_callsign,
-                self.station_beacon['position'][0], 
-                self.station_beacon['position'][1],
-                self.station_beacon['comment'], 
-                self.station_beacon['icon'],
-                position_report=True)
+                                              self.station_beacon['position'][0],
+                                              self.station_beacon['position'][1],
+                                              self.station_beacon['comment'],
+                                              self.station_beacon['icon'],
+                                              position_report=True)
 
             # Send the packet as an iGated packet.
             self.aprsis_upload(self.aprs_callsign, _packet, igate=True)
             self.last_user_position_upload = time.time()
 
-
     def update_station_position(self, lat, lon, alt):
         """ Update the internal station position record. Used when determining the station position by GPSD """
         self.station_beacon['position'] = (lat, lon, alt)
-
-
 
     def aprs_upload_thread(self):
         ''' Handle uploading of packets to Habitat '''
@@ -481,10 +475,10 @@ class APRSUploader(object):
 
                 # Convert to a packet.
                 try:
-                    (_packet, _call) = telemetry_to_aprs_position(_telem, 
-                        object_name=self.object_name_override,
-                        aprs_comment = self.object_comment,
-                        position_report=self.position_report)
+                    (_packet, _call) = telemetry_to_aprs_position(_telem,
+                                                                  object_name=self.object_name_override,
+                                                                  aprs_comment=self.object_comment,
+                                                                  position_report=self.position_report)
                 except Exception as e:
                     self.log_error("Error converting telemetry to APRS packet - %s" % str(e))
                     _packet = None
@@ -495,9 +489,9 @@ class APRSUploader(object):
                     # usually based on the sonde serial number, and we iGate the position report.
                     # Otherwise, we upload APRS Objects, sourced by our own callsign, but still iGated via us.
                     if self.position_report:
-                        self.aprsis_upload(_call,_packet,igate=True)
+                        self.aprsis_upload(_call, _packet, igate=True)
                     else:
-                        self.aprsis_upload(self.aprs_callsign,_packet,igate=True)
+                        self.aprsis_upload(self.aprs_callsign, _packet, igate=True)
 
             else:
                 # Wait for a short time before checking the queue again.
@@ -505,11 +499,9 @@ class APRSUploader(object):
 
         self.log_debug("Stopped APRS Uploader Thread.")
 
-
-
     def upload_timer(self):
         """ Add packets to the habitat upload queue if it is time for us to upload. """
-        
+
         while self.timer_thread_running:
             if int(time.time()) % self.synchronous_upload_time == 0:
                 # Time to upload! 
@@ -534,7 +526,6 @@ class APRSUploader(object):
                 # Not yet time to upload, wait for a bit.
                 time.sleep(0.1)
 
-
     def process_queue(self):
         """ Process packets from the input queue.
 
@@ -553,7 +544,7 @@ class APRSUploader(object):
 
                 if _id not in self.observed_payloads:
                     # We haven't seen this ID before, so create a new dictionary entry for it.
-                    self.observed_payloads[_id] = {'count':1, 'data':Queue()}
+                    self.observed_payloads[_id] = {'count': 1, 'data': Queue()}
                     self.log_debug("New Payload %s. Not observed enough to allow upload." % _id)
                     # However, we don't yet add anything to the queue for this payload...
                 else:
@@ -569,12 +560,10 @@ class APRSUploader(object):
                     else:
                         self.log_debug("Payload ID %s not observed enough to allow upload." % _id)
 
-            if (time.time() - self.last_user_position_upload) > self.station_beacon['rate']*60:
+            if (time.time() - self.last_user_position_upload) > self.station_beacon['rate'] * 60:
                 self.beacon_station_position()
 
-
             time.sleep(0.1)
-
 
     def add(self, telemetry):
         """ Add a dictionary of telemetry to the input queue. 
@@ -601,8 +590,6 @@ class APRSUploader(object):
         else:
             self.log_error("Processing not running, discarding.")
 
-
-
     def close(self):
         ''' Shutdown uploader and processing threads. '''
         self.log_debug("Waiting for threads to close...")
@@ -620,14 +607,12 @@ class APRSUploader(object):
         if self.input_thread is not None:
             self.input_thread.join()
 
-
     def log_debug(self, line):
         """ Helper function to log a debug message with a descriptive heading. 
         Args:
             line (str): Message to be logged.
         """
         logging.debug("APRS-IS - %s" % line)
-
 
     def log_info(self, line):
         """ Helper function to log an informational message with a descriptive heading. 
@@ -636,14 +621,12 @@ class APRSUploader(object):
         """
         logging.info("APRS-IS - %s" % line)
 
-
     def log_error(self, line):
         """ Helper function to log an error message with a descriptive heading. 
         Args:
             line (str): Message to be logged.
         """
         logging.error("APRS-IS - %s" % line)
-
 
     def log_warning(self, line):
         """ Helper function to log a warning message with a descriptive heading. 
@@ -653,25 +636,32 @@ class APRSUploader(object):
         logging.warning("APRS-IS - %s" % line)
 
 
-
 if __name__ == "__main__":
     # Some unit tests for the APRS packet generation code.
     # ['frame', 'id', 'datetime', 'lat', 'lon', 'alt', 'temp', 'type', 'freq', 'freq_float', 'datetime_dt']
     test_telem = [
         # These types of DFM serial IDs are deprecated
-        #{'id':'DFM06-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        #{'id':'DFM09-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        #{'id':'DFM15-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        #{'id':'DFM17-12345678', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        {'id':'DFM-19123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM17', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        {'id':'DFM-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM06', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        {'id':'N1234567', 'frame':10, 'lat':-10.00001, 'lon':9.99999999, 'alt':10000, 'temp':1.0, 'type':'RS41', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        {'id':'M1234567', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'RS92', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
-        ]
-
+        # {'id':'DFM06-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
+        # {'id':'DFM09-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
+        # {'id':'DFM15-123456', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
+        # {'id':'DFM17-12345678', 'frame':10, 'lat':-10.0, 'lon':10.0, 'alt':10000, 'temp':1.0, 'type':'DFM', 'freq':'401.520 MHz', 'freq_float':401.52, 'heading':0.0, 'vel_h':5.1, 'vel_v':-5.0, 'datetime_dt':datetime.datetime.utcnow()},
+        {'id': 'DFM-19123456', 'frame': 10, 'lat': -10.0, 'lon': 10.0, 'alt': 10000, 'temp': 1.0, 'type': 'DFM17',
+         'freq': '401.520 MHz', 'freq_float': 401.52, 'heading': 0.0, 'vel_h': 5.1, 'vel_v': -5.0,
+         'datetime_dt': datetime.datetime.utcnow()},
+        {'id': 'DFM-123456', 'frame': 10, 'lat': -10.0, 'lon': 10.0, 'alt': 10000, 'temp': 1.0, 'type': 'DFM06',
+         'freq': '401.520 MHz', 'freq_float': 401.52, 'heading': 0.0, 'vel_h': 5.1, 'vel_v': -5.0,
+         'datetime_dt': datetime.datetime.utcnow()},
+        {'id': 'N1234567', 'frame': 10, 'lat': -10.00001, 'lon': 9.99999999, 'alt': 10000, 'temp': 1.0, 'type': 'RS41',
+         'freq': '401.520 MHz', 'freq_float': 401.52, 'heading': 0.0, 'vel_h': 5.1, 'vel_v': -5.0,
+         'datetime_dt': datetime.datetime.utcnow()},
+        {'id': 'M1234567', 'frame': 10, 'lat': -10.0, 'lon': 10.0, 'alt': 10000, 'temp': 1.0, 'type': 'RS92',
+         'freq': '401.520 MHz', 'freq_float': 401.52, 'heading': 0.0, 'vel_h': 5.1, 'vel_v': -5.0,
+         'datetime_dt': datetime.datetime.utcnow()},
+    ]
 
     comment_field = "Clb=<vel_v> t=<temp> <freq> Type=<type> Radiosonde http://bit.ly/2Bj4Sfk"
 
     for _telem in test_telem:
-        out_str = telemetry_to_aprs_position(_telem, object_name="<id>", aprs_comment=comment_field, position_report=False)
+        out_str = telemetry_to_aprs_position(_telem, object_name="<id>", aprs_comment=comment_field,
+                                             position_report=False)
         print(out_str)

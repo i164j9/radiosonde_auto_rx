@@ -11,13 +11,13 @@ import logging
 import os
 import time
 from threading import Thread
+
 try:
     # Python 2
     from Queue import Queue
 except ImportError:
     # Python 3
     from queue import Queue
-
 
 
 class TelemetryLogger(object):
@@ -36,12 +36,13 @@ class TelemetryLogger(object):
     FILE_ACTIVITY_TIMEOUT = 300
 
     # We require the following fields to be present in the input telemetry dict.
-    REQUIRED_FIELDS = ['frame', 'id', 'datetime', 'lat', 'lon', 'alt', 'temp', 'humidity', 'type', 'freq', 'datetime_dt', 'vel_v', 'vel_h', 'heading']
+    REQUIRED_FIELDS = ['frame', 'id', 'datetime', 'lat', 'lon', 'alt', 'temp', 'humidity', 'type', 'freq',
+                       'datetime_dt', 'vel_v', 'vel_h', 'heading']
 
     LOG_HEADER = "timestamp,serial,frame,lat,lon,alt,vel_v,vel_h,heading,temp,humidity,type,freq_mhz,snr,f_error_hz,sats,batt_v,burst_timer,aux_data\n"
 
     def __init__(self,
-        log_directory = "./log"):
+                 log_directory="./log"):
         """ Initialise and start a sonde logger.
         
         Args:
@@ -60,12 +61,10 @@ class TelemetryLogger(object):
         # Input Queue.
         self.input_queue = Queue()
 
-
         # Start queue processing thread.
         self.input_processing_running = True
         self.log_process_thread = Thread(target=self.process_queue)
         self.log_process_thread.start()
-
 
     def add(self, telemetry):
         """ Add a dictionary of telemetry to the input queue. 
@@ -86,7 +85,6 @@ class TelemetryLogger(object):
             self.input_queue.put(telemetry)
         else:
             self.log_error("Processing not running, discarding.")
-
 
     def process_queue(self):
         """ Process data from the input queue, and write telemetry to log files.
@@ -110,7 +108,6 @@ class TelemetryLogger(object):
             time.sleep(0.5)
 
         self.log_info("Stopped Telemetry Logger Thread.")
-
 
     def telemetry_to_string(self, telemetry):
         """ Convert a telemetry dictionary to a CSV string.
@@ -170,7 +167,6 @@ class TelemetryLogger(object):
         else:
             _log_line += ",-1"
 
-
         # Terminate the log line.
         _log_line += "\n"
 
@@ -186,7 +182,6 @@ class TelemetryLogger(object):
         _id = telemetry['id']
         _type = telemetry['type']
 
-
         # If there is no log open for the current ID check to see if there is an existing (closed) log file, and open it.
         if _id not in self.open_logs:
             _search_string = os.path.join(self.log_directory, "*%s_*_sonde.log" % (_id))
@@ -196,23 +191,22 @@ class TelemetryLogger(object):
                 _log_file_name = _existing_files[0]
                 self.log_info("Using existing log file: %s" % _log_file_name)
                 # Create entry in open logs dictionary
-                self.open_logs[_id] = {'log':open(_log_file_name,'a'), 'last_time':time.time()}
+                self.open_logs[_id] = {'log': open(_log_file_name, 'a'), 'last_time': time.time()}
             else:
                 # Create a new log file.
                 _log_suffix = "%s_%s_%s_%d_sonde.log" % (
                     datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S"),
                     _id,
                     _type,
-                    int(telemetry['freq_float']*1e3) # Convert frequency to kHz
-                    )
+                    int(telemetry['freq_float'] * 1e3)  # Convert frequency to kHz
+                )
                 _log_file_name = os.path.join(self.log_directory, _log_suffix)
                 self.log_info("Opening new log file: %s" % _log_file_name)
                 # Create entry in open logs dictionary
-                self.open_logs[_id] = {'log':open(_log_file_name,'a'), 'last_time':time.time()}
+                self.open_logs[_id] = {'log': open(_log_file_name, 'a'), 'last_time': time.time()}
 
                 # Write in a header line.
                 self.open_logs[_id]['log'].write(self.LOG_HEADER)
-
 
         # Produce log file sentence.
         _log_line = self.telemetry_to_string(telemetry)
@@ -223,7 +217,6 @@ class TelemetryLogger(object):
         # Update the last_time field.
         self.open_logs[_id]['last_time'] = time.time()
         self.log_debug("Wrote line: %s" % _log_line.strip())
-
 
     def cleanup_logs(self):
         """ Close any open logs that have not had telemetry added in X seconds. """
@@ -241,12 +234,9 @@ class TelemetryLogger(object):
             except Exception as e:
                 self.log_error("Error closing log for %s - %s" % (_id, str(e)))
 
-
-
     def close(self):
         """ Close input processing thread. """
         self.input_processing_running = False
-
 
     def running(self):
         """ Check if the logging thread is running. 
@@ -256,7 +246,6 @@ class TelemetryLogger(object):
         """
         return self.input_processing_running
 
-
     def log_debug(self, line):
         """ Helper function to log a debug message with a descriptive heading. 
         Args:
@@ -264,14 +253,12 @@ class TelemetryLogger(object):
         """
         logging.debug("Telemetry Logger - %s" % line)
 
-
     def log_info(self, line):
         """ Helper function to log an informational message with a descriptive heading. 
         Args:
             line (str): Message to be logged.
         """
         logging.info("Telemetry Logger - %s" % line)
-
 
     def log_error(self, line):
         """ Helper function to log an error message with a descriptive heading. 
